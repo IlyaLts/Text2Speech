@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>Text2Speech</Name>
+    <Version>1.2.1</Version>
+    <Title>Grammar Checker Installer</Title>
+    <ProductUrl>https://github.com/IlyaLts/Text2Speech</ProductUrl>
+    <WizardShowPageList>false</WizardShowPageList>
+        <RunProgram>@TargetDir@/Text2Speech</RunProgram>
+    <RunProgramArguments>launchOnStartup</RunProgramArguments>
+    <StartMenuDir>Grammar Checker</StartMenuDir>
+    <TargetDir>@ApplicationsDir@/Text2Speech</TargetDir>
+    <ControlScript>ControlScript.qs</ControlScript>
+    <InstallerApplicationIcon>../../Icon</InstallerApplicationIcon>
+</Installer>
