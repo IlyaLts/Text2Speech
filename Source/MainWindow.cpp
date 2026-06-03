@@ -39,6 +39,16 @@
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QVBoxLayout>
+#include <liboai.h>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wextra"
+#pragma GCC diagnostic ignored "-Wreorder"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+
+#pragma GCC diagnostic pop
+
+using namespace liboai;
 
 /*
 ===================
@@ -66,11 +76,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
 
     notification.setSource(QUrl::fromLocalFile("sounds/notification.wav"));
 
-    for (int i = 0; i < NUMBER_OF_TABS; i++)
+    for (int i = 0; i < NumberOfProfiles; i++)
     {
         profiles[i] = new Profile();
         ui->tabWidget->addTab(profiles[i], tr("Profile") + " " + QString::number(i + 1));
     }
+
+    connect(&notificationTimer, &QTimer::timeout, &notification, &QSoundEffect::play);
+    notificationTimer.setSingleShot(false);
 
     setupMenus();
     readSettings();
@@ -121,7 +134,7 @@ MainWindow::text2Speech
 */
 void MainWindow::text2Speech(int id)
 {
-    if (id < 0 || id >= NUMBER_OF_TABS)
+    if (id < 0 || id >= NumberOfProfiles)
         return;
 
     QClipboard *clipboard = QApplication::clipboard();
@@ -132,18 +145,20 @@ void MainWindow::text2Speech(int id)
 
     QString input = clipboard->text();
 
-    auto modelData = profiles[id]->currentModel();
+    auto providerData = profiles[id]->currentProvider();
 
-    QString modelName = modelData.first;
-    ModelProvider *model = modelData.second;
+    QString providerName = providerData.first;
+    ModelProvider *provider = providerData.second;
+
+    if (!provider || providerName.isEmpty() || input.isEmpty())
+        restoreClipboard(savedClipboard);
 
     if (notificationSoundAction->isChecked())
-        notification.play();
+        notificationTimer.start(300);
 
-    //////////////////////////////////////////
+    ///////////////////////////////
 
-    clipboard->setText(savedClipboard);
-    gcApp->waitForClipboardChange();
+    restoreClipboard(savedClipboard);
 }
 
 /*
@@ -424,8 +439,8 @@ void MainWindow::readSettings()
     bool showInTray = settings.value("ShowInTray", QSystemTrayIcon::isSystemTrayAvailable()).toBool();
     showInTrayAction->setChecked(showInTray);
     language = static_cast<QLocale::Language>(settings.value("Language", QLocale::system().language()).toInt());
-    smoothTypingDelay = settings.value("SmoothTypingDynamicDelay", SMOOTH_TYPING_DELAY).toInt();
-    maxTimeout = settings.value("MaxTimeout", MAX_TIMEOUT).toInt();
+    smoothTypingDelay = settings.value("SmoothTypingDynamicDelay", SmoothTypingDelay).toInt();
+    maxTimeout = settings.value("MaxTimeout", MaxTimeout).toInt();
 
 #ifdef Q_OS_WIN
     smoothTypingAction->setChecked(settings.value("SmoothTyping", true).toBool());
@@ -433,11 +448,30 @@ void MainWindow::readSettings()
     smoothTypingAction->setChecked(false);
 #endif
 
-    providers.insert("Google", { "https://generativelanguage.googleapis.com/v1beta", "", { "gemini-2.5-flash" } });
+    // https://docs.cloud.google.com/text-to-speech/docs/gemini-tts
+    providers.insert("Google", { "Google", "https://generativelanguage.googleapis.com/v1beta",
+                                { "gemini-3.1-flash-tts-preview",
+                                  "gemini-2.5-flash-tts",
+                                  "gemini-2.5-flash-lite-preview-tts",
+                                  "gemini-2.5-pro-tts" },
+                                { "Achernar", "Achird", "Algenib",
+                                  "Algieba", "Alnilam", "Aoede",
+                                  "Autonoe", "Callirrhoe", "Charon",
+                                  "Despina", "Enceladus", "Erinome",
+                                  "Fenrir", "Gacrux", "Iapetus",
+                                  "Kore", "Laomedeia", "Leda",
+                                  "Orus", "Pulcherrima", "Puck",
+                                  "Rasalgethi", "Sadachbia", "Sadaltager",
+                                  "Schedar", "Sulafat", "Umbriel",
+                                  "Vindemiatrix", "Zephyr", "Zubenelgenubi" },
+                                "Kore" });
 
-    // Loads models
+    // Loads providers
     for (auto &provider : settings.childGroups())
     {
+        if (provider.startsWith("Profile", Qt::CaseInsensitive))
+            continue;
+
         if (!providers.contains(provider))
             providers.insert(provider, ModelProvider());
 
@@ -446,21 +480,54 @@ void MainWindow::readSettings()
         settings.beginGroup(provider);
 
         modelProvider.url = settings.value("URL", modelProvider.url).toString();
-        modelProvider.key = settings.value("Key", modelProvider.key).toString();
 
         settings.beginGroup("Models");
 
         for (auto &model : settings.allKeys())
-            modelProvider.models.insert(model);
+            modelProvider.models.append(model);
+
+        settings.endGroup();
+        settings.beginGroup("Voices");
+
+        for (auto &voice : settings.allKeys())
+            modelProvider.voices.append(voice);
 
         settings.endGroup();
         settings.endGroup();
     }
 
-    for (int i = 0; i < NUMBER_OF_TABS; i++)
+    for (int i = 0; i < NumberOfProfiles; i++)
+    {
+        for (auto &provider : providers)
+        {
+            settings.beginGroup("Profile" + QString::number(i));
+
+            settings.beginGroup("Keys");
+            profiles[i]->currentKeys[provider.name] = settings.value(provider.name).toString();
+            settings.endGroup();
+
+            settings.beginGroup("Voices");
+            profiles[i]->currentVoices[provider.name] = settings.value(provider.name, provider.defaultVoice).toString();
+            settings.endGroup();
+
+            settings.endGroup();
+        }
+    }
+
+    for (int i = 0; i < NumberOfProfiles; i++)
     {
         profiles[i]->setProviders(providers);
         profiles[i]->readSettings();
+    }
+
+    for (int i = 0; i < NumberOfProfiles; i++)
+    {
+        int index = profiles[i]->voiceComboBox->findText(profiles[i]->currentVoices[profiles[i]->currentProvider().first]);
+
+        if (index >= 0)
+            profiles[i]->voiceComboBox->setCurrentIndex(index);
+
+        profiles[i]->keyLineEdit->setText(profiles[i]->currentKeys[profiles[i]->currentProvider().first]);
     }
 }
 
@@ -496,17 +563,41 @@ void MainWindow::writeSettings() const
     {
         settings.beginGroup(it.key());
         settings.setValue("URL", it.value().url);
-        settings.setValue("Key", it.value().key);
+
         settings.beginGroup("Models");
 
         for (auto &model : it.value().models)
             settings.setValue(model, "");
 
         settings.endGroup();
+        settings.beginGroup("Voices");
+
+        for (auto &voice : it.value().voices)
+            settings.setValue(voice, "");
+
+        settings.endGroup();
         settings.endGroup();
     }
 
-    for (int i = 0; i < NUMBER_OF_TABS; i++)
+    for (int i = 0; i < NumberOfProfiles; i++)
+    {
+        for (auto &provider : providers)
+        {
+            settings.beginGroup("Profile" + QString::number(i));
+
+            settings.beginGroup("Keys");
+            settings.setValue(provider.name, profiles[i]->currentKeys.value(provider.name));
+            settings.endGroup();
+
+            settings.beginGroup("Voices");
+            settings.setValue(provider.name, profiles[i]->currentVoices.value(provider.name));
+            settings.endGroup();
+
+            settings.endGroup();
+        }
+    }
+
+    for (int i = 0; i < NumberOfProfiles; i++)
         profiles[i]->writeSettings();
 }
 
@@ -532,6 +623,6 @@ void MainWindow::retranslate()
     for (int i = 0; i < ui->tabWidget->count(); i++)
         ui->tabWidget->setTabText(i, tr("Profile") + " " + QString::number(i + 1));
 
-    for (int i = 0; i < NUMBER_OF_TABS; i++)
+    for (int i = 0; i < NumberOfProfiles; i++)
         profiles[i]->retranslate();
 }

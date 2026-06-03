@@ -1,15 +1,24 @@
 QT += widgets multimedia
 
+INCLUDEPATH += liboai-main/liboai/include/ \
+               curl-8.11.1_3-win64-mingw/include \
+               json/include
+
 win32 {
-    LIBS += -lUser32 \
+    LIBS += -L"$$PWD/liboai-main/liboai" -lliboai \
+            -lUser32 \
+            -L"$$PWD/curl-8.11.1_3-win64-mingw/lib" -llibcurl -llibcurl.dll
 }
 
 unix {
-    LIBS += -lX11 \
+    LIBS += -L"$$PWD/liboai-main/liboai" -loai \
+            -lcurl \
+            -lX11 \
             -lXtst
 }
 
 CONFIG += c++20 lrelease embed_translations pkgconfig
+PKGCONFIG += libcurl
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.

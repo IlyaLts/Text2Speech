@@ -26,10 +26,11 @@
 #include <QMainWindow>
 #include <QSystemTrayIcon>
 #include <QSoundEffect>
+#include <QTimer>
 
-#define SMOOTH_TYPING_DELAY     250
-#define MAX_TIMEOUT             30000
-#define NUMBER_OF_TABS          4
+static constexpr quint64 SmoothTypingDelay = 250;
+static constexpr quint64 MaxTimeout = 30000;
+static constexpr quint64 NumberOfProfiles = 4;
 
 extern const char *defaultPrompt;
 extern const char *hiddenPrompt;
@@ -42,9 +43,11 @@ class UnhidableMenu;
 
 struct ModelProvider
 {
+    QString name;
     QString url;
-    QString key;
-    QSet<QString> models;
+    QStringList models;
+    QStringList voices;
+    QString defaultVoice;
 };
 
 /*
@@ -102,7 +105,7 @@ private:
     QIcon iconMain;
     QIcon iconSettings;
 
-    Profile *profiles[NUMBER_OF_TABS];
+    Profile *profiles[NumberOfProfiles];
     QMap<QString, ModelProvider> providers;
     QList<QAction *> languageActions;
     QAction *notificationSoundAction;
@@ -120,10 +123,11 @@ private:
     UnhidableMenu *settingsMenu;
     UnhidableMenu *languageMenu;
 
+    QTimer notificationTimer;
     QSoundEffect notification;
     QLocale::Language language;
     bool appInitiated = false;
-    int smoothTypingDelay = SMOOTH_TYPING_DELAY;
+    int smoothTypingDelay = SmoothTypingDelay;
     int32_t maxTimeout = 30000;
 };
 

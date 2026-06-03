@@ -52,21 +52,28 @@ public:
     void readSettings();
     void writeSettings() const;
 
-    inline QPair<QString, ModelProvider *> currentModel() const { return modelComboBox->currentData().value<QPair<QString, ModelProvider *>>(); }
     inline QKeySequence keySequence() const { return shortcutEdit->keySequence(); }
+    inline QPair<QString, ModelProvider *> currentProvider() const { return modelComboBox->currentData().value<QPair<QString, ModelProvider *>>(); }
+    inline QString model() const { return modelComboBox->currentText().sliced(currentProvider().first.size() + 1); }
+    inline QString voice() const { return voiceComboBox->currentText(); }
     inline QString key() const { return keyLineEdit->text(); }
 
 private Q_SLOTS:
 
     void enableStateChanged(Qt::CheckState state);
     void keySequenceChanged(const QKeySequence &keySequence);
-    void keyChanged(const QString &key);
     void modelChanged();
+    void keyChanged(const QString &key);
+    void voiceChanged(int index);
 
 private:
 
     static int nextId;
 
+public:
+
+    QMap<QString, QString> currentKeys;
+    QMap<QString, QString> currentVoices;
     int id;
     QCheckBox *enableCheckBox;
     QVBoxLayout *tabLayout;
@@ -74,6 +81,8 @@ private:
     QKeySequenceEdit *shortcutEdit;
     QLabel *modelLabel;
     QComboBox *modelComboBox;
+    QLabel *voiceLabel;
+    QComboBox *voiceComboBox;
     QLabel *keyLabel;
     QLineEdit *keyLineEdit;
 };
