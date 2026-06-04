@@ -30,7 +30,8 @@
 
 static constexpr quint64 SmoothTypingDelay = 250;
 static constexpr quint64 MaxTimeout = 30000;
-static constexpr quint64 NumberOfProfiles = 4;
+static constexpr quint64 NotificationDelay = 400;
+static constexpr int NumberOfProfiles = 4;
 
 extern const char *defaultPrompt;
 extern const char *hiddenPrompt;
@@ -109,7 +110,6 @@ private:
     QMap<QString, ModelProvider> providers;
     QList<QAction *> languageActions;
     QAction *notificationSoundAction;
-    QAction *smoothTypingAction;
     QAction *launchOnStartupAction;
     QAction *showInTrayAction;
     QAction *openConfigAction;

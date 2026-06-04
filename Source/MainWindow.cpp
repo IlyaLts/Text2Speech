@@ -338,7 +338,6 @@ void MainWindow::setupMenus()
     iconSettings.addFile(":/Images/IconSettings.png");
 
     notificationSoundAction = new QAction("&" + tr("Notification Sound"), this);
-    smoothTypingAction = new QAction("&" + tr("Smooth Typing"), this);
     launchOnStartupAction = new QAction("&" + tr("Launch on Startup"), this);
     showInTrayAction = new QAction("&" + tr("Show in System Tray"), this);
     openConfigAction = new QAction("&" + tr("Open Config"), this);
@@ -357,10 +356,8 @@ void MainWindow::setupMenus()
     showInTrayAction->setCheckable(true);
 
 #ifdef Q_OS_WIN
-    smoothTypingAction->setCheckable(true);
     launchOnStartupAction->setChecked(QFile::exists(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation) + "/Startup/Text2Speech.lnk"));
 #else
-    smoothTypingAction->setCheckable(false);
     launchOnStartupAction->setChecked(QFile::exists(QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + "/autostart/Text2Speech.desktop"));
 #endif
 
@@ -376,10 +373,6 @@ void MainWindow::setupMenus()
     settingsMenu->setIcon(iconSettings);
     settingsMenu->addMenu(languageMenu);
     settingsMenu->addAction(notificationSoundAction);
-
-#ifdef Q_OS_WIN
-    settingsMenu->addAction(smoothTypingAction);
-#endif
 
     settingsMenu->addAction(launchOnStartupAction);
     settingsMenu->addAction(showInTrayAction);
@@ -407,7 +400,6 @@ void MainWindow::setupMenus()
     this->menuBar()->addMenu(settingsMenu);
 
     connect(notificationSoundAction, &QAction::triggered, this, &MainWindow::toggleNotificationSound);
-    connect(smoothTypingAction, &QAction::triggered, this, &MainWindow::toggleSmoothTyping);
     connect(launchOnStartupAction, &QAction::triggered, this, &MainWindow::toggleLaunchOnStartup);
     connect(showInTrayAction, &QAction::triggered, this, &MainWindow::toggleShowInTray);
     connect(openConfigAction, &QAction::triggered, this, &MainWindow::openConfig);
@@ -441,12 +433,6 @@ void MainWindow::readSettings()
     language = static_cast<QLocale::Language>(settings.value("Language", QLocale::system().language()).toInt());
     smoothTypingDelay = settings.value("SmoothTypingDynamicDelay", SmoothTypingDelay).toInt();
     maxTimeout = settings.value("MaxTimeout", MaxTimeout).toInt();
-
-#ifdef Q_OS_WIN
-    smoothTypingAction->setChecked(settings.value("SmoothTyping", true).toBool());
-#else
-    smoothTypingAction->setChecked(false);
-#endif
 
     // https://docs.cloud.google.com/text-to-speech/docs/gemini-tts
     providers.insert("Google", { "Google", "https://generativelanguage.googleapis.com/v1beta",
@@ -552,7 +538,6 @@ void MainWindow::writeSettings() const
     settings.setValue("Fullscreen", isMaximized());
     settings.setValue("NotificationSound", notificationSoundAction->isChecked());
     settings.setValue("NotificationSoundVolume", notification.volume());
-    settings.setValue("SmoothTyping", smoothTypingAction->isChecked());
     settings.setValue("ShowInTray", showInTrayAction->isChecked());
     settings.setValue("Language", language);
     settings.setValue("SmoothTypingDynamicDelay", smoothTypingDelay);
@@ -611,7 +596,6 @@ void MainWindow::retranslate()
     settingsMenu->setTitle("&" + tr("Settings"));
     languageMenu->setTitle("&" + tr("Language"));
     notificationSoundAction->setText("&" + tr("Notification Sound"));
-    smoothTypingAction->setText("&" + tr("Smooth Typing"));
     launchOnStartupAction->setText("&" + tr("Launch on Startup"));
     showInTrayAction->setText("&" + tr("Show in System Tray"));
     openConfigAction->setText("&" + tr("Open Config"));
