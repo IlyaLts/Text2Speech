@@ -98,6 +98,9 @@ private:
     void writeSettings() const;
     void retranslate();
     void restoreClipboard(const QString &savedClipboard);
+    void message(const QString &message);
+    QByteArray synthesizeSpeechOpenai(Profile &profile, const QString &input);
+    QByteArray synthesizeSpeechGemini(Profile &profile, const QString &input);
 
     NativeEventFilter filter;
 

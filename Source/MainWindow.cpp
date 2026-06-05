@@ -40,6 +40,15 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <liboai.h>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QAudioFormat>
+#include <QBuffer>
+#include <QAudioSink>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wextra"
@@ -129,6 +138,20 @@ void MainWindow::show()
 
 /*
 ===================
+MainWindow::message
+===================
+*/
+void MainWindow::message(const QString &message)
+{
+#ifdef QT_DEBUG
+    qDebug() << message;
+#else
+    QMessageBox::critical(nullptr, "Text2Speech", message);
+#endif
+}
+
+/*
+===================
 MainWindow::text2Speech
 ===================
 */
@@ -154,11 +177,174 @@ void MainWindow::text2Speech(int id)
         restoreClipboard(savedClipboard);
 
     if (notificationSoundAction->isChecked())
-        notificationTimer.start(300);
+        notificationTimer.start(NotificationDelay);
 
-    ///////////////////////////////
+    QByteArray audio;
+
+    if (providerName.compare("Google", Qt::CaseInsensitive) == 0)
+        audio = synthesizeSpeechGemini(*profiles[id], input);
+    else
+        audio = synthesizeSpeechOpenai(*profiles[id], input);
+
+    notificationTimer.stop();
+
+    if (!audio.isEmpty())
+    {
+        QByteArray audioContent = QByteArray::fromBase64(audio);
+
+        QAudioFormat format;
+        format.setSampleRate(24000);
+        format.setChannelCount(1);
+        format.setSampleFormat(QAudioFormat::Int16);
+
+        QBuffer *audioBuffer = new QBuffer();
+        audioBuffer->setData(audioContent);
+        audioBuffer->open(QIODevice::ReadOnly);
+
+        QAudioSink *audioSink = new QAudioSink(format);
+
+        QObject::connect(audioSink, &QAudioSink::stateChanged, [audioSink, audioBuffer](QAudio::State newState)
+        {
+            if (newState == QAudio::IdleState || newState == QAudio::StoppedState)
+            {
+                audioSink->stop();
+                audioSink->deleteLater();
+                audioBuffer->close();
+                audioBuffer->deleteLater();
+            }
+        });
+
+        audioSink->start(audioBuffer);
+    }
 
     restoreClipboard(savedClipboard);
+}
+
+/*
+===================
+MainWindow::synthesizeSpeechOpenai
+===================
+*/
+QByteArray MainWindow::synthesizeSpeechOpenai(Profile &profile, const QString &input)
+{
+    OpenAI oai(profile.currentProvider().second->url.toUtf8().data());
+    oai.auth.SetMaxTimeout(maxTimeout);
+
+    if (oai.auth.SetKey(profile.key().toStdString()))
+    {
+#if 0
+        // Lists the currently available models
+        Response response = oai.model.list();
+
+        std::cout << response["data"];
+        return;
+#endif
+
+        try
+        {
+            Response res = oai.Audio->speech(profile.model().toStdString(), profile.voice().toStdString(), input.toStdString());
+            return QByteArray(res.content.c_str());
+        }
+        catch (std::exception& e)
+        {
+            message(e.what());
+            return QByteArray();
+        }
+    }
+    else
+    {
+        message("Couldn't set the authorization key for the OpenAI API");
+        return QByteArray();
+    }
+}
+
+/*
+===================
+MainWindow::synthesizeSpeechGemini
+
+https://docs.cloud.google.com/text-to-speech/docs/gemini-tts
+===================
+*/
+QByteArray MainWindow::synthesizeSpeechGemini(Profile &profile, const QString &input)
+{
+    QNetworkAccessManager manager;
+    QString targetUrl = QString("%1/models/%2:generateContent?key=%3").arg(profile.currentProvider().second->url, profile.model(), profile.key());
+
+    /*
+    {
+        "contents":[
+        {
+            "parts":[
+            {
+                "text":"Hello, World!"
+            }]
+        }],
+        "generationConfig":
+        {
+            "responseModalities":["AUDIO"],
+            "speechConfig":
+            {
+                "voiceConfig":
+                {
+                    "prebuiltVoiceConfig":
+                    {
+                        "voiceName":"Kore"
+                    }
+                }
+            }
+        }
+    }
+    */
+
+    QNetworkRequest request((QUrl(targetUrl)));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    // contents
+    QJsonObject textObj{{"text", input}};
+    QJsonObject partsObj{{"parts", QJsonArray{textObj}}};
+    QJsonObject contentsObj{};
+
+    // generationConfig
+    QJsonObject voiceNameObj{{"voiceName", profile.voice()}};
+    QJsonObject prebuiltVoiceObj{{"prebuiltVoiceConfig", voiceNameObj}};
+    QJsonObject voiceConfigObj{{"voiceConfig", prebuiltVoiceObj}};
+    QJsonObject generationConfigObj{{"responseModalities", QJsonArray{"AUDIO"}}, {"speechConfig", voiceConfigObj}};
+
+    // Main
+    QJsonObject mainObj{{"contents", QJsonArray{partsObj}}, {"generationConfig", generationConfigObj}};
+    QByteArray payload = QJsonDocument(mainObj).toJson(QJsonDocument::Compact);
+
+    QEventLoop loop;
+    QNetworkReply *reply = manager.post(request, payload);
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+
+    loop.exec();
+
+    if (reply->error() == QNetworkReply::NoError)
+    {
+        QJsonDocument responseJson = QJsonDocument::fromJson(reply->readAll());
+        QJsonObject responseObj(responseJson.object());
+        QJsonArray candidates = responseObj["candidates"].toArray();
+
+        if (!candidates.isEmpty())
+        {
+            QJsonObject content = candidates[0].toObject()["content"].toObject();
+            QJsonArray parts = content["parts"].toArray();
+
+            if (!parts.isEmpty())
+                return parts[0].toObject()["inlineData"].toObject()["data"].toString().toUtf8();
+        }
+    }
+    else
+    {
+        message(QString("Network Error %1 - %2").arg(QString::number(reply->error()), reply->errorString()));
+        reply->deleteLater();
+        return QByteArray();
+    }
+
+    message("Audio data is empty.");
+    reply->deleteLater();
+    return QByteArray();
 }
 
 /*
@@ -377,7 +563,7 @@ void MainWindow::setupMenus()
     settingsMenu->addAction(launchOnStartupAction);
     settingsMenu->addAction(showInTrayAction);
     settingsMenu->addSeparator();
-    settingsMenu->addAction(openConfigAction);    
+    settingsMenu->addAction(openConfigAction);
     settingsMenu->addAction(reportBugAction);
     settingsMenu->addSeparator();
     settingsMenu->addAction(version);
@@ -434,7 +620,6 @@ void MainWindow::readSettings()
     smoothTypingDelay = settings.value("SmoothTypingDynamicDelay", SmoothTypingDelay).toInt();
     maxTimeout = settings.value("MaxTimeout", MaxTimeout).toInt();
 
-    // https://docs.cloud.google.com/text-to-speech/docs/gemini-tts
     providers.insert("Google", { "Google", "https://generativelanguage.googleapis.com/v1beta",
                                 { "gemini-3.1-flash-tts-preview",
                                   "gemini-2.5-flash-tts",
