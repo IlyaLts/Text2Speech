@@ -244,7 +244,7 @@ void Profile::modelChanged()
         return;
 
     voiceComboBox->clear();
-    voiceComboBox->addItems(currentProvider().second->voices);
+    voiceComboBox->addItems(QList<QString>(currentProvider().second->voices.begin(), currentProvider().second->voices.end()));
 
     int index = voiceComboBox->findText(currentVoices[currentProvider().first]);
 

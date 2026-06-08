@@ -46,8 +46,8 @@ struct ModelProvider
 {
     QString name;
     QString url;
-    QStringList models;
-    QStringList voices;
+    QSet<QString> models;
+    QSet<QString> voices;
     QString defaultVoice;
 };
 

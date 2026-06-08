@@ -655,13 +655,13 @@ void MainWindow::readSettings()
         settings.beginGroup("Models");
 
         for (auto &model : settings.allKeys())
-            modelProvider.models.append(model);
+            modelProvider.models.insert(model);
 
         settings.endGroup();
         settings.beginGroup("Voices");
 
         for (auto &voice : settings.allKeys())
-            modelProvider.voices.append(voice);
+            modelProvider.voices.insert(voice);
 
         settings.endGroup();
         settings.endGroup();
