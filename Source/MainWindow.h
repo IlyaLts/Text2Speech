@@ -30,7 +30,6 @@
 
 static constexpr quint64 SmoothTypingDelay = 250;
 static constexpr quint64 MaxTimeout = 30000;
-static constexpr quint64 NotificationDelay = 400;
 static constexpr int NumberOfProfiles = 4;
 
 extern const char *defaultPrompt;
@@ -126,8 +125,7 @@ private:
     UnhidableMenu *settingsMenu;
     UnhidableMenu *languageMenu;
 
-    QTimer notificationTimer;
-    QSoundEffect notification;
+    QSoundEffect clock;
     QLocale::Language language;
     bool appInitiated = false;
     int smoothTypingDelay = SmoothTypingDelay;

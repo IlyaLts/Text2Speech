@@ -83,16 +83,14 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     this->menuBar()->setStyleSheet(styleSheet);
 #endif
 
-    notification.setSource(QUrl::fromLocalFile("sounds/notification.wav"));
+    clock.setSource(QUrl::fromLocalFile("sounds/clock.wav"));
+    clock.setLoopCount(QSoundEffect::Infinite);
 
     for (int i = 0; i < NumberOfProfiles; i++)
     {
         profiles[i] = new Profile();
         ui->tabWidget->addTab(profiles[i], tr("Profile") + " " + QString::number(i + 1));
     }
-
-    connect(&notificationTimer, &QTimer::timeout, &notification, &QSoundEffect::play);
-    notificationTimer.setSingleShot(false);
 
     setupMenus();
     readSettings();
@@ -177,7 +175,7 @@ void MainWindow::text2Speech(int id)
         restoreClipboard(savedClipboard);
 
     if (notificationSoundAction->isChecked())
-        notificationTimer.start(NotificationDelay);
+        clock.play();
 
     QByteArray audio;
 
@@ -186,7 +184,7 @@ void MainWindow::text2Speech(int id)
     else
         audio = synthesizeSpeechOpenai(*profiles[id], input);
 
-    notificationTimer.stop();
+    clock.stop();
 
     if (!audio.isEmpty())
     {
@@ -613,7 +611,7 @@ void MainWindow::readSettings()
     setWindowState(settings.value("Fullscreen", false).toBool() ? Qt::WindowMaximized : Qt::WindowActive);
 
     notificationSoundAction->setChecked(settings.value("NotificationSound", true).toBool());
-    notification.setVolume(settings.value("NotificationSoundVolume", 1.0f).toFloat());
+    clock.setVolume(settings.value("NotificationSoundVolume", 1.0f).toFloat());
     bool showInTray = settings.value("ShowInTray", QSystemTrayIcon::isSystemTrayAvailable()).toBool();
     showInTrayAction->setChecked(showInTray);
     language = static_cast<QLocale::Language>(settings.value("Language", QLocale::system().language()).toInt());
@@ -722,7 +720,7 @@ void MainWindow::writeSettings() const
 
     settings.setValue("Fullscreen", isMaximized());
     settings.setValue("NotificationSound", notificationSoundAction->isChecked());
-    settings.setValue("NotificationSoundVolume", notification.volume());
+    settings.setValue("NotificationSoundVolume", clock.volume());
     settings.setValue("ShowInTray", showInTrayAction->isChecked());
     settings.setValue("Language", language);
     settings.setValue("SmoothTypingDynamicDelay", smoothTypingDelay);
