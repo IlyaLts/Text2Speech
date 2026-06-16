@@ -1,6 +1,6 @@
 /*
 ===============================================================================
-    Copyright (C) 2025 Ilya Lyakhovets
+    Copyright (C) 2026 Ilya Lyakhovets
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
     setTranslator(static_cast<QLocale::Language>(settings.value("Language", systemLanguage).toInt()));    
     connect(QApplication::clipboard(), &QClipboard::dataChanged, this, &Application::clipboardChanged);
 }
-#include <iostream>
+
 /*
 ===================
 Application::waitForClipboardChange
@@ -78,19 +78,13 @@ bool Application::waitForClipboardChange()
     while (!m_clipboardChanged)
     {
         if (timer.hasExpired(10000))
-        {
-            std::cout << "FAIL 1";
             return false;
-        }
 
         QApplication::processEvents(QEventLoop::AllEvents, 50);
     }
 
     if (QApplication::clipboard()->text().isEmpty())
-    {
-        std::cout << "FAIL 2";
         return false;
-    }
 
     return true;
 }
